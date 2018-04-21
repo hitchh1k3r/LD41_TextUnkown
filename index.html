@@ -1,0 +1,129 @@
+<html style="margin:0;padding:0;width:100%;height:100%;">
+  <head>
+    <style type="text/css">
+      body {
+        background: #000;
+      }
+      #gameArea
+      {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+      }
+      #gameCanvas
+      {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        image-rendering:pixelated;
+      }
+    </style>
+  </head>
+  <body style="margin:0;padding:0;width:100%;height:100%;" onload="resizeGame();">
+
+    <div id="gameArea">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script type='text/javascript'>
+      var width = 640;
+      var height = 480;
+
+      function newModule()
+      {
+        return {
+          preRun: [function() {
+            console.log("PRE-RUN");
+          }],
+          postRun: [function() {
+            console.log("POST-RUN");
+          }],
+          setStatus: function(text) {
+            console.log("Status: " + text);
+          },
+          onRuntimeInitialized: function() {
+            console.log("RUNTIME INITIALIZED");
+
+            var start = Date.now();
+            var c = document.getElementById("gameCanvas");
+            c.width = width;
+            c.height = height;
+
+            var ctx = c.getContext('2d');
+            var imageData = ctx.getImageData(0, 0, width, height);
+            var bufSize = width * height * 4;
+
+            Module._load();
+
+            var bufPtr = Module._malloc(bufSize);
+            var buf = new Uint8Array(Module.HEAP8.buffer, bufPtr, bufSize);
+
+            var wrappedTick=Module.cwrap('tick','void',['number','number','number','number']);
+
+            var repaint = function(){
+              {
+                var now = Date.now();
+                wrappedTick(buf.byteOffset, width, height, now - start);
+                start = now;
+                imageData.data.set(buf);
+                ctx.putImageData(imageData, 0, 0);
+                window.requestAnimationFrame(repaint);
+              }
+            };
+            repaint();
+          },
+          print: function(text) { console.log('stdout: ' + text) },
+          canvas: document.getElementById('gameCanvas'),
+        };
+      }
+
+      function resizeGame()
+      {
+        var maxPixelDeformation = 1.15;
+        var gameArea = document.getElementById("gameArea");
+        var aspect = width / height;
+        var newWidth = window.innerWidth;
+        var newHeight = window.innerHeight;
+        var newWidthToHeight = newWidth / newHeight;
+
+        if(newWidthToHeight > aspect)
+        {
+          if(newWidthToHeight > maxPixelDeformation * aspect)
+          {
+            newWidth = newHeight * maxPixelDeformation * aspect;
+            gameArea.style.height = newHeight + 'px';
+            gameArea.style.width = newWidth + 'px';
+          }
+          else
+          {
+            gameArea.style.height = newHeight + 'px';
+            gameArea.style.width = newWidth + 'px';
+          }
+        }
+        else
+        {
+          if(newWidthToHeight < aspect / maxPixelDeformation)
+          {
+            newHeight = newWidth * maxPixelDeformation / aspect;
+            gameArea.style.width = newWidth + 'px';
+            gameArea.style.height = newHeight + 'px';
+          }
+          else
+          {
+            gameArea.style.width = newWidth + 'px';
+            gameArea.style.height = newHeight + 'px';
+          }
+        }
+
+        gameArea.style.marginTop = (-newHeight / 2) + 'px';
+        gameArea.style.marginLeft = (-newWidth / 2) + 'px';
+      }
+
+      window.addEventListener('resize', resizeGame, false);
+      window.addEventListener('orientationchange', resizeGame, false);
+
+      var Module = newModule();
+    </script>
+    <script async type="text/javascript" src="game.js"></script>
+  </body>
+</html>
